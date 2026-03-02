@@ -56,6 +56,9 @@ if SERVER then return end -- не смотрите так на меня :)
 -- Выглядит вот так https://img.qweqwe.ovh/1526574184864.png
 IGS.C.NotifyAboutNewItems = true
 
+-- true = обновление баланса раз в 1 сек (экономия FPS), false = раз в 0.5 сек
+-- IGS.C.LowGraphics = false
+
 
 -- Эта иконка будет отображена для предмета, если для него не будет установлена кастомная через :SetIcon()
 -- Отображается вот тут: https://img.qweqwe.ovh/1494088609445.png

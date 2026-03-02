@@ -58,8 +58,10 @@ hook.Add("IGS.IncomingMessage","InventoryActions",function(d, method)
 	if not pl then return end
 
 	IGS.Notify(pl, "Перезагрузка инвентаря")
-	IGS.LoadInventory(pl,function()
+	IGS.LoadInventory(pl, function()
 		IGS.Notify(pl, "Инвентарь перезагружен")
+		net.Start("IGS.InventoryUpdated")
+		net.Send(pl)
 	end)
 end)
 

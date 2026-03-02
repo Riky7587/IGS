@@ -81,7 +81,7 @@ function IGS.UI()
 		end
 	end)
 
-	-- Баланс
+	-- Баланс с автообновлением по интервалу (оптимизация FPS)
 	uigs.Create("igs_button", function(self)
 		function self:UPDBalance()
 			self.bal = LocalPlayer():IGSFunds()
@@ -93,8 +93,12 @@ function IGS.UI()
 		self:UPDBalance()
 		self:SetTooltip("Открыть список покупок")
 		self.Think = function(s)
-			if s.bal ~= LocalPlayer():IGSFunds() then
-				s:UPDBalance()
+			local interval = (IGS.C and IGS.C.LowGraphics) and 1 or 0.5
+			if not s._nextBalanceCheck or CurTime() >= s._nextBalanceCheck then
+				s._nextBalanceCheck = CurTime() + interval
+				if s.bal ~= LocalPlayer():IGSFunds() then
+					s:UPDBalance()
+				end
 			end
 		end
 

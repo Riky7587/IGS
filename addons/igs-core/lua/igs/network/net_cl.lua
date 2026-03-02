@@ -1,22 +1,35 @@
+-- Один обработчик на всё время — net.Receive заменяет предыдущий при каждом вызове,
+-- из‑за чего ответ на первый клик терялся при повторном нажатии
+local pendingPurchase = nil
+
+net.Receive("IGS.Purchase", function()
+	local errMsg = net.ReadIGSError()
+	local invDbID_ = not errMsg and IGS.C.Inv_Enabled and net.ReadUInt(IGS.BIT_INV_ID)
+
+	local uid, cb = pendingPurchase and pendingPurchase.uid, pendingPurchase and pendingPurchase.cb
+	pendingPurchase = nil
+
+	local ITEM = uid and IGS.GetItemByUID(uid)
+	if errMsg then
+		if cb then cb(errMsg) end
+		if ITEM then hook.Run("IGS.OnFailedPurchase", ITEM, errMsg) end
+	else
+		if cb then cb(nil, invDbID_) end
+		if ITEM then hook.Run("IGS.PlayerPurchasedItem", LocalPlayer(), ITEM, invDbID_) end
+	end
+end)
+
 -- Запрашивает покупку итема в инвентарь
 function IGS.Purchase(sItemUID, callback)
+	if pendingPurchase then
+		if callback then callback("Подождите, предыдущая покупка в процессе") end
+		return
+	end
+
+	pendingPurchase = { uid = sItemUID, cb = callback }
 	net.Start("IGS.Purchase")
 		net.WriteString(sItemUID)
 	net.SendToServer()
-
-	net.Receive("IGS.Purchase",function()
-		local errMsg  = net.ReadIGSError()
-
-		local ITEM = IGS.GetItemByUID(sItemUID)
-		if errMsg then
-			if callback then callback(errMsg) end
-			hook.Run("IGS.OnFailedPurchase", ITEM, errMsg)
-		else
-			local invDbID_ = IGS.C.Inv_Enabled and net.ReadUInt(IGS.BIT_INV_ID)
-			if callback then callback(nil, invDbID_) end
-			hook.Run("IGS.PlayerPurchasedItem", LocalPlayer(), ITEM, invDbID_)
-		end
-	end)
 end
 
 -- Активирует купленный итем (Только если IGS.C.Inv_Enabled)
@@ -149,6 +162,10 @@ end
 
 
 
+
+net.Receive("IGS.InventoryUpdated", function()
+	hook.Run("IGS.InventoryUpdated")
+end)
 
 net.Receive("IGS.PaymentStatusUpdated",function()
 	local t = {}

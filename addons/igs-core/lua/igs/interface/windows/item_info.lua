@@ -1,20 +1,29 @@
 local m
 
+-- Покупка с блокировкой кнопки на время запроса (защита от двойного клика)
 local function purchase(ITEM, buy_button)
-	IGS.Purchase(ITEM:UID(), function(errMsg,dbID)
+	if buy_button.igs_purchasing then return end
+	buy_button.igs_purchasing = true
+	buy_button:SetActive(false)
+	buy_button:SetText("Обработка...")
+
+	IGS.Purchase(ITEM:UID(), function(errMsg, dbID)
 		if not IsValid(buy_button) then return end
+		buy_button.igs_purchasing = nil
+		buy_button:SetActive(IGS.CanAfford(LocalPlayer(), ITEM:GetPrice(LocalPlayer())))
+		buy_button:SetText("Купить за " .. PL_MONEY(ITEM:GetPrice(LocalPlayer())))
 
 		if errMsg then
 			IGS.ShowNotify(errMsg, "Ошибка покупки")
-			surface.PlaySound("ambient/voices/citizen_beaten1.wav") -- еще есть
+			surface.PlaySound("ambient/voices/citizen_beaten1.wav")
 			return
 		end
 
 		buy_button.purchased = buy_button.purchased or 0
 		buy_button.purchased = buy_button.purchased + 1
 
-
 		if ITEM:IsStackable() then
+			buy_button:SetActive(true)
 			buy_button:SetText("Куплено " .. buy_button.purchased .. " шт")
 		else
 			if IsValid(m) then

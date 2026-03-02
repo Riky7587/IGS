@@ -11,7 +11,8 @@ local function loadTab(activity,sidebar,dat)
 	)
 
 	bg.OnRemove = function()
-		hook.Remove("IGS.PlayerPurchasedItem","UpdateInventoryView")
+		hook.Remove("IGS.PlayerPurchasedItem", "UpdateInventoryView")
+		hook.Remove("IGS.InventoryUpdated", "UpdateInventoryViewFull")
 	end
 
 	-- local act_tall = activity:GetTall() - activity.tabBar:GetTall()
@@ -86,15 +87,27 @@ local function loadTab(activity,sidebar,dat)
 			end
 		end
 
-		for _,v in ipairs(dat) do
-			icons:AddItem(v.item, v.id)
+		local function setData(newDat)
+			icons:Clear()
+			for _, v in ipairs(newDat) do
+				icons:AddItem(v.item, v.id)
+			end
 		end
 
-		hook.Add("IGS.PlayerPurchasedItem","UpdateInventoryView",function(_, ITEM, invDbID)
+		setData(dat)
+
+		hook.Add("IGS.PlayerPurchasedItem", "UpdateInventoryView", function(_, ITEM, invDbID)
+			if not ITEM or ITEM.isnull then return end
 			icons:AddItem(ITEM, invDbID)
 		end)
 
-
+		-- Полное обновление при изменении инвентаря через панель/сайт
+		hook.Add("IGS.InventoryUpdated", "UpdateInventoryViewFull", function()
+			IGS.GetInventory(function(items)
+				if not IsValid(bg) then return end
+				setData(items)
+			end)
+		end)
 	end) )
 
 	scr:AddItem(uigs.Create("Panel", function(end_margin)
