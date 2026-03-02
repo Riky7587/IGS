@@ -152,19 +152,19 @@ timer.Simple(1, function() -- http.Fetch
 
 		-- Сравнение версий вида "1.2024.1" (tonumber возвращает nil для такого формата)
 		local function version_cmp(a, b)
-			if not a or not b then return (a or "") > (b or "") end
+			a, b = tostring(a or ""), tostring(b or "")
 			local pa, pb = {}, {}
-			for n in string.gmatch(a, "%d+") do table.insert(pa, tonumber(n)) end
-			for n in string.gmatch(b, "%d+") do table.insert(pb, tonumber(n)) end
+			for n in string.gmatch(a, "%d+") do table.insert(pa, tonumber(n) or 0) end
+			for n in string.gmatch(b, "%d+") do table.insert(pb, tonumber(n) or 0) end
 			for i = 1, math.max(#pa, #pb) do
-				local va, vb = pa[i] or 0, pb[i] or 0
+				local va, vb = tonumber(pa[i]) or 0, tonumber(pb[i]) or 0
 				if va ~= vb then return va > vb end
 			end
 			return false
 		end
 
 		table.sort(releases, function(a, b)
-			return version_cmp(a.tag_name, b.tag_name)
+			return version_cmp(a and a.tag_name, b and b.tag_name)
 		end)
 
 		-- Парсинг major из строки "1.2024.1"
