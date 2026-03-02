@@ -142,15 +142,41 @@ timer.Simple(1, function() -- http.Fetch
 	if not IGS_REPO then return end
 	http.Fetch("https://api.github.com/repos/" .. IGS_REPO .. "/releases", function(json)
 		local releases = util.JSONToTable(json)
+		-- Фильтр релизов с валидным tag_name (GitHub может вернуть draft без тега)
+		for i = #releases, 1, -1 do
+			if not releases[i].tag_name or releases[i].tag_name == "" then
+				table.remove(releases, i)
+			end
+		end
 		assert(releases[1], "Релизов нет. Нужно запустить CI") -- форк
 
+		-- Сравнение версий вида "1.2024.1" (tonumber возвращает nil для такого формата)
+		local function version_cmp(a, b)
+			if not a or not b then return (a or "") > (b or "") end
+			local pa, pb = {}, {}
+			for n in string.gmatch(a, "%d+") do table.insert(pa, tonumber(n)) end
+			for n in string.gmatch(b, "%d+") do table.insert(pb, tonumber(n)) end
+			for i = 1, math.max(#pa, #pb) do
+				local va, vb = pa[i] or 0, pb[i] or 0
+				if va ~= vb then return va > vb end
+			end
+			return false
+		end
+
 		table.sort(releases, function(a, b)
-			return tonumber(a.tag_name) > tonumber(b.tag_name)
+			return version_cmp(a.tag_name, b.tag_name)
 		end)
 
-		local current_ver    = cookie.GetNumber("igs_version") or 0 -- or 0 для постоянных напоминаний про обнову, если локальная установка
-		local freshest_major = math.floor(releases[1].tag_name)
-		local current_major  = math.floor(current_ver)
+		-- Парсинг major из строки "1.2024.1"
+		local function tag_major(tag)
+			if not tag then return 0 end
+			local n = tag:match("^(%d+)")
+			return tonumber(n) or 0
+		end
+
+		local current_ver    = cookie.GetString("igs_version") or cookie.GetNumber("igs_version") or "0"
+		local freshest_major = tag_major(releases[1].tag_name)
+		local current_major  = tag_major(tostring(current_ver))
 
 		if freshest_major > current_major then
 			local info_url = "https://github.com/" .. IGS_REPO .. "/releases/tag/" .. freshest_major
@@ -164,8 +190,8 @@ timer.Simple(1, function() -- http.Fetch
 
 		local freshest_suitable -- "123.2"
 		for _, release in ipairs(releases) do -- от свежайших
-			if current_ver == tonumber(release.tag_name) then break end -- 123.1 current and 123.1 suitable
-			if math.floor(release.tag_name) == current_major then -- (123).1 == (123).2
+			if tostring(current_ver) == tostring(release.tag_name) then break end -- уже на этой версии
+			if tag_major(release.tag_name) == current_major then -- (123).1 == (123).2
 				freshest_suitable = release.tag_name
 				break
 			end
