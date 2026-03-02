@@ -73,6 +73,13 @@ local function loadFromFile(superfile)
 	RunString(IGS_MOUNT[path], path)
 end
 
+-- Сброс сохранённой версии. Работает до загрузки superfile — когда igs-core ещё не загружен
+concommand.Add("igs_flushversion", function(pl)
+	if IsValid(pl) then return end -- только из консоли сервера
+	cookie.Delete("igs_version")
+	print("[IGS] Версия сброшена. Перезапустите сервер для загрузки актуальной версии.")
+end)
+
 local function findFreshestVersion(cb)
 	wrapFetch("https://api.github.com/repos/" .. IGS_REPO .. "/releases", function(json)
 		local releases = util.JSONToTable(json)
@@ -87,11 +94,20 @@ local function findFreshestVersion(cb)
 	end)
 end
 
+-- Убирает префикс v из версии (v1.6 -> 1.6). Релизы без v, старые cookie могли сохранить v
+local function normalizeVersion(v)
+	if v and v:sub(1, 1) == "v" then
+		return v:sub(2), true -- вернули без v, нужно обновить cookie
+	end
+	return v, false
+end
+
 if SERVER then
 	local superfile = file.Read("igs/superfile.txt")
-	local version   = cookie.GetString("igs_version")
+	local version, needFix = normalizeVersion(cookie.GetString("igs_version"))
 
 	if superfile and version then -- 2 может не быть, если сервер перенесли без sv.db
+		if needFix then cookie.Set("igs_version", version) end
 		loadFromFile(superfile)
 
 	elseif not version then
@@ -101,12 +117,15 @@ if SERVER then
 		end)
 
 	else -- version
-		downloadSuperfile(version, loadFromFile)
+		downloadSuperfile(version, function(superfile)
+			if needFix then cookie.Set("igs_version", version) end
+			loadFromFile(superfile)
+		end)
 	end
 
 elseif CLIENT then
 	CreateConVar("igs_version", "", {FCVAR_REPLICATED})
-	local version = GetConVar("igs_version"):GetString()
+	local version = select(1, normalizeVersion(GetConVar("igs_version"):GetString()))
 	assert(tonumber(version), "cvar igs_version не передался клиенту. " .. version .. ": igs-gmod.ru")
 	downloadSuperfile(version, loadFromFile)
 end
